@@ -1,0 +1,6 @@
+# mbed
+BUILD
+.mbed
+mbed_settings.py
+mbed_settings.pyc
+*.pyc

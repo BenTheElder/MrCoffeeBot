@@ -1,0 +1,2 @@
+mbed-cli==1.0.0
+pyserial>=3.2.1
