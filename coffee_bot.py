@@ -59,7 +59,10 @@ def _run_thread(serial_port, state):
             reply = bytes.decode('utf-8')
             #print(reply)
             if reply.startswith("TEMP+"):
-                state.current_temp = float(reply[5:len(reply)-1])
+                try:
+                    state.current_temp = float(reply[5:len(reply)-1])
+                except:
+                    pass
             elif reply.startswith("BREW+"):
                 state.heater_on = reply[6] == '1'
             else:

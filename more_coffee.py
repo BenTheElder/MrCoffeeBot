@@ -48,7 +48,7 @@ def main():
     print("Finding Mr. Coffee Bot")
     bot = coffee_bot.get_coffee_bot()
     try:    
-        do_brew(bot)
+        do_brew(bot, brew_seconds=210)
     except KeyboardInterrupt:
         print("\nCaught KeyboardInterrupt, Turning off Heater.")
         bot.turn_off_heater()
