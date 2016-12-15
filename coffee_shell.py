@@ -23,7 +23,7 @@ import coffee_bot
 
 # TODO: these constants will need to be refined
 TARGET_INITIAL_TEMP = 54
-SECONDS_PER_CUP = 7.5
+SECONDS_PER_CUP = 52.5
 
 def do_brew(bot, seconds=0, cups=None):
     """
@@ -42,8 +42,14 @@ def do_brew(bot, seconds=0, cups=None):
         while now < deadline:
             now_date = datetime.fromtimestamp(now)
             remaining = deadline - now
-            sys.stdout.write("TIME: %s Remaining: %f Temp: %.1fc        \r"%
-                        (now_date, remaining, bot.maybe_current_temp()))
+            temp = bot.maybe_current_temp()
+            temp_s = ""
+            if temp is None or temp == 0:
+                temp_s = "?"
+            else:
+                temp_s = "%.1f" % (temp)
+            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c        \r"%
+                                (now_date, remaining, temp_s))
             sys.stdout.flush()
             now = time.time()
     else:
@@ -55,8 +61,14 @@ def do_brew(bot, seconds=0, cups=None):
         while bot.maybe_current_temp() < TARGET_INITIAL_TEMP:
             now = time.time()
             now_date = datetime.fromtimestamp(now)
-            sys.stdout.write("TIME: %s Target Temp: %.1f Temp: %.1fc        \r"%
-                    (now_date, TARGET_INITIAL_TEMP, bot.maybe_current_temp()))
+            temp = bot.maybe_current_temp()
+            temp_s = ""
+            if temp is None or temp == 0:
+                temp_s = "?"
+            else:
+                temp_s = "%.1f" % (temp)
+            sys.stdout.write("TIME: %s Target Temp: %.1f Temp: %s c        \r"%
+                                (now_date, TARGET_INITIAL_TEMP, temp_s))
             sys.stdout.flush()
         brew_seconds = SECONDS_PER_CUP * cups
         now = time.time()
@@ -64,9 +76,14 @@ def do_brew(bot, seconds=0, cups=None):
         while now < deadline:
             now_date = datetime.fromtimestamp(now)
             remaining = deadline - now
-            sys.stdout.write("TIME: %s Remaining: %f Temp: %.1fc        \r"%
-                        (now_date, remaining, bot.maybe_current_temp()))
-            sys.stdout.flush()
+            temp = bot.maybe_current_temp()
+            temp_s = ""
+            if temp is None or temp == 0:
+                temp_s = "?"
+            else:
+                temp_s = "%.1f" % (temp)
+            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c        \r"%
+                                (now_date, remaining, temp_s))
             now = time.time()
     print("\nTurning off Heater.")
     bot.turn_off_heater()
@@ -121,9 +138,12 @@ def get_command():
     # handle commands with arguments
     if parts[0] == "brew":
         # parse amount
-        args = amount_to_args(parts[1])
-        if args is not None:
-            cmd = "brew"
+        try:
+            args = amount_to_args(parts[1])
+            if args is not None:
+                cmd = "brew"
+        except ValueError:
+            pass
     return (cmd, args)
 
 def print_motd():
@@ -151,11 +171,7 @@ def main():
     try:
         # Coffee REPL
         while True:
-            try:
-                command, args = get_command()
-            except:
-                print("Unrecognized Command.")
-                continue
+            command, args = get_command()
             if command is None:
                 print("Unrecognized Command.")
             elif command == "exit":
@@ -170,3 +186,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
