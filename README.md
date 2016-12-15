@@ -50,3 +50,5 @@ Finally run `mbed deploy` from the repository to fetch the mbed dependencies,
 Licensed under the [Apache v2.0 License](https://www.apache.org/licenses/LICENSE-2.0).  
 See LICENSE.
 
+DS1820.h and DS1820.cpp are written by Michael Hagberg Michael@RedBoxCode.com with 
+ modifications by Benjamin Elder, and are also under the Apache v2.0 License. 

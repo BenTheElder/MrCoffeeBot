@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 #include "mbed.h"
+#include "DS1820.h"
 #include <limits>
 
 #define TEMPERATURE_PROBE_PIN p8
@@ -48,6 +49,7 @@ bool starts_with(const char *pre, const char *str) {
 
 // Globals
 DigitalOut heater(HEATER_PIN);
+DS1820 probe(TEMPERATURE_PROBE_PIN);
 Watchdog wdt;
 Serial pc(USBTX, USBRX);
 
@@ -84,6 +86,8 @@ int main() {
                 // reset watchdog
                 wdt.feed();
                 // reply with temperature
+                probe.convertTemperature(true, DS1820::this_device);
+                temperature = probe.temperature();
                 pc.printf("TEMP+%.1f\n", temperature);
             } else if (starts_with("BREW+", recv_buff)) {
                 // reset watchdog
