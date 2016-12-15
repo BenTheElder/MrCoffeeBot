@@ -22,6 +22,9 @@ import sys
 import coffee_bot
 
 def do_brew(bot, brew_seconds=30):
+    """
+        do_brew attempts to connect bot and and brew for brew_seconds
+    """
     print("Connecting to: '%s'"%(bot.get_port_path()))
     bot.run()
     print("Brewing for %d seconds."%(brew_seconds))
@@ -44,10 +47,14 @@ def do_brew(bot, brew_seconds=30):
     sys.stdout.flush()
 
 def main():
+    """
+        the entry point to more_coffee
+        makes roughly 4 cups (30 seconds)
+    """
     brew_seconds = 30
     print("Finding Mr. Coffee Bot")
     bot = coffee_bot.get_coffee_bot()
-    try:    
+    try:
         do_brew(bot, brew_seconds=210)
     except KeyboardInterrupt:
         print("\nCaught KeyboardInterrupt, Turning off Heater.")

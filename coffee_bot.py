@@ -128,6 +128,10 @@ class MrCoffeeBot(object):
 
 
 def get_possible_ports():
+    """
+        get_possible_ports enumerates tty devices that look like
+        the expected mbed controller
+    """
     devices, details = [], []
     for port in serial.tools.list_ports.comports():
         if port.manufacturer == "mbed":
@@ -137,6 +141,13 @@ def get_possible_ports():
     return devices, details
 
 def get_coffee_bot(serial_string=None):
+    """
+        get_coffee_bot attempts to find the coffee pot serial port
+        and return a MrCoffeeBot for this port.
+        if serial_string != None, this will exclusively be a port
+        with the matching serial
+        if no matching port is found, None is returned
+    """
     devices, details = get_possible_ports()
     for i in range(len(devices)):
         path, (ser, port) = devices[i], details[i]
