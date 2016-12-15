@@ -35,7 +35,7 @@ def do_brew(bot, brew_seconds=30):
     while now < deadline:
         now_date = datetime.fromtimestamp(now)
         remaining = deadline - now
-        sys.stdout.write("TIME: %s Remaining: %f Temp: %fc        \r"%
+        sys.stdout.write("TIME: %s Remaining: %f Temp: %.1fc        \r"%
                     (now_date, remaining, bot.maybe_current_temp()))
         sys.stdout.flush()
         now = time.time()
