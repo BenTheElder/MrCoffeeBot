@@ -18,22 +18,30 @@ limitations under the License.
 #include "DS1820.h"
 #include <limits>
 
+// hardware pinout constants
 #define TEMPERATURE_PROBE_PIN p8
 #define HEATER_PIN p21
 
+// Watchdog class based on
 // https://developer.mbed.org/cookbook/WatchDog-Timer
+// https://developer.mbed.org/forum/mbed/topic/508/
+// And the NXP LPC1768 User Manual:
+// http://www.nxp.com/documents/user_manual/UM10360.pdf
 class Watchdog {
 public:
-// Load timeout value in watchdog timer and enable
+    // Load timeout value in watchdog timer and enable
     void setTimeout(float s) {
-        LPC_WDT->WDCLKSEL = 0x1;                // Set CLK src to PCLK
-        uint32_t clk = SystemCoreClock / 16;    // WD has a fixed /4 prescaler, PCLK default is /4
+        // Set CLK src to PCLK
+        LPC_WDT->WDCLKSEL = 0x1;
+        // WD has a fixed /4 prescaler, PCLK default is /4
+        uint32_t clk = SystemCoreClock / 16;
         LPC_WDT->WDTC = s * (float)clk;
-        LPC_WDT->WDMOD = 0x3;                   // Enabled and Reset
+        // Enabled and Reset
+        LPC_WDT->WDMOD = 0x3;
         feed();
     }
-// "feed" the dog - reset the watchdog timer
-// by writing this required bit pattern
+    // "feed" the dog - reset the watchdog timer by writing
+    // this required bit pattern (0xAA55)
     void feed() {
         LPC_WDT->WDFEED = 0xAA;
         LPC_WDT->WDFEED = 0x55;
@@ -56,6 +64,7 @@ Serial pc(USBTX, USBRX);
 #define RECEIVE_BUFF_SIZE 7*3
 char recv_buff[RECEIVE_BUFF_SIZE];
 
+// For debug only, this is an LED on the mbed device.
 DigitalOut led1(LED1);
 
 // main() runs in its own thread in mbed-OS
@@ -73,39 +82,40 @@ int main() {
     memset(recv_buff, 0, RECEIVE_BUFF_SIZE);
     while (true) {
         led1 = !led1;
+        // get a line
         bool newline = false;
-        if (pc.readable()) {
+        while (!newline) {
+            // wait for character
+            // while (!pc.readable());
+            // don't overflow read buffer, at this point something is wrong
+            if (curr_buff == recv_buff + RECEIVE_BUFF_SIZE) {
+                curr_buff = recv_buff;
+            }
             *curr_buff = pc.getc();
             newline = (*curr_buff == '\n');
             curr_buff++;
-        } else {
-            continue;
         }
-        if (newline) { 
-            if (starts_with("TEMP+?", recv_buff)) {
-                // reset watchdog
-                wdt.feed();
-                // reply with temperature
-                probe.convertTemperature(true, DS1820::this_device);
-                temperature = probe.temperature();
-                pc.printf("TEMP+%.1f\n", temperature);
-            } else if (starts_with("BREW+", recv_buff)) {
-                // reset watchdog
-                wdt.feed();
-                // update heater setting and reply with heater value
-                bool new_heater = recv_buff[5] != '0';
-                heater = new_heater;
-                if (new_heater) {
-                    pc.printf("BREW+1\n");
-                } else {
-                    pc.printf("BREW+0\n");
-                }
+        // process line
+        if (starts_with("TEMP+?", recv_buff)) {
+            // reset watchdog
+            wdt.feed();
+            // reply with temperature
+            probe.convertTemperature(true, DS1820::this_device);
+            temperature = probe.temperature();
+            pc.printf("TEMP+%.1f\n", temperature);
+        } else if (starts_with("BREW+", recv_buff)) {
+            // reset watchdog
+            wdt.feed();
+            // update heater setting and reply with heater value
+            bool new_heater = recv_buff[5] != '0';
+            heater = new_heater;
+            if (new_heater) {
+                pc.printf("BREW+1\n");
+            } else {
+                pc.printf("BREW+0\n");
             }
-            curr_buff = recv_buff;
-        // don't overflow read buffer, at this point something is wrong
-        } else if (curr_buff == recv_buff + RECEIVE_BUFF_SIZE) {
-            curr_buff = recv_buff;
         }
+        curr_buff = recv_buff;
     }
 }
 
