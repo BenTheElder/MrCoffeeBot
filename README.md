@@ -2,7 +2,6 @@
 
 This is the software that runs my modified 12 - Cup Mr. Coffee pot.
 
-NOTE: only the mbed / c++ code is used currently, the python client is dated and bad.
 
 ## Hardware
 

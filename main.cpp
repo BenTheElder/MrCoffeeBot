@@ -87,13 +87,13 @@ void update_water_level() {
     water_distance_inches = water_level_sensor.read_inches();
 }
 
-// heater is disabled if the range finder goes above this distance (in inches) 
-#define MAX_WATER_DISTANCE 7.5
-// values above this are just steam skewing the sensor
-#define MAX_REAL_WATER_DISTANCE 9.0
-bool has_water() {
-    return water_distance_inches < MAX_WATER_DISTANCE ||
-           water_distance_inches > MAX_REAL_WATER_DISTANCE;
+
+bool probably_has_water() {
+    double d = water_distance_inches;
+    // 7.5 inches is roughly the real maximum
+    // after ~8.2 we can guess that the steam has skewed the measurement
+    // after 20 (most arbitrary) the steam is intense and we should back off
+    return d < 7.5 || d > 8.2 && d < 20;
 }
 
 // process_line handles one line of input and returns true if the line
@@ -112,7 +112,7 @@ bool process_line() {
     } else if (starts_with("BREW+", recv_buff)) {
         // update heater setting and reply with heater value
         // ignore input and don't leave the heater on if there is no water
-        bool new_heater = (recv_buff[5] != '0') && has_water();
+        bool new_heater = (recv_buff[5] != '0') && probably_has_water();
         heater = new_heater;
         if (new_heater) {
             pc.printf("BREW+1\n");
@@ -178,7 +178,7 @@ int main() {
         }
 
         // always disable heater if there is no water
-        if (!has_water()) {
+        if (!probably_has_water()) {
             heater = false;
         }
     }
