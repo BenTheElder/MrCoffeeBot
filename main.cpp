@@ -32,9 +32,6 @@ limitations under the License.
 #define WATER_HCSR04_TRIG_PIN p22
 #define WATER_HCSR04_ECHO_PIN p23
 
-// other constants
-// heater is disabled if the range finder goes above this distance (in inches) 
-#define MAX_WATER_DISTANCE 7.5
 
 // Watchdog class based on
 // https://developer.mbed.org/cookbook/WatchDog-Timer
@@ -90,9 +87,18 @@ void update_water_level() {
     water_distance_inches = water_level_sensor.read_inches();
 }
 
+// heater is disabled if the range finder goes above this distance (in inches) 
+#define MAX_WATER_DISTANCE 7.5
+// values above this are just steam skewing the sensor
+#define MAX_REAL_WATER_DISTANCE 9.0
+bool has_water() {
+    return water_distance_inches < MAX_WATER_DISTANCE ||
+           water_distance_inches > MAX_REAL_WATER_DISTANCE;
+}
+
 // process_line handles one line of input and returns true if the line
 // was valid / handled and WDT should be reset
-bool process_line(const char *recv_buff) {
+bool process_line() {
     if (starts_with("WATER+?", recv_buff)) {
         // reply with water distance measurement (inches, to two places)
         pc.printf("WATER+%.2f\n", water_distance_inches);
@@ -106,8 +112,7 @@ bool process_line(const char *recv_buff) {
     } else if (starts_with("BREW+", recv_buff)) {
         // update heater setting and reply with heater value
         // ignore input and don't leave the heater on if there is no water
-        bool new_heater = recv_buff[5] != '0' && 
-                          (water_distance_inches < MAX_WATER_DISTANCE);
+        bool new_heater = (recv_buff[5] != '0') && has_water();
         heater = new_heater;
         if (new_heater) {
             pc.printf("BREW+1\n");
@@ -139,8 +144,8 @@ int main() {
 
     // loop vars
     // NOTE: if we poll the HCSR04 too fast the readings are useless
+    update_water_level();
     RateLimiter water_level_sensor_limiter(5000, update_water_level);
-    water_level_sensor_limiter.fn();
     // current location in the receive buffer
     char *curr_buff = recv_buff;
     while (true) {
@@ -150,7 +155,7 @@ int main() {
 
         // handle input
         bool received_newline = false;
-        if (pc.readable()) {
+        while (pc.readable() && !received_newline) {
             // don't overflow read buffer, at this point something is wrong
             if (curr_buff == recv_buff + RECEIVE_BUFF_SIZE) {
                 curr_buff = recv_buff;
@@ -163,7 +168,7 @@ int main() {
         // process a line if we have one
         if (received_newline) {
             // and feed the watchdog if we process a legitimate line
-            if (process_line(recv_buff)) {
+            if (process_line()) {
                 wdt.feed();
                 // debug feeding watchdog
                 led1 = !led1;
@@ -173,7 +178,7 @@ int main() {
         }
 
         // always disable heater if there is no water
-        if (water_distance_inches > MAX_WATER_DISTANCE) {
+        if (!has_water()) {
             heater = false;
         }
     }
