@@ -14,13 +14,27 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-#include "mbed.h"
-#include "DS1820.h"
 #include <limits>
 
-// hardware pinout constants
+#include "mbed.h"
+
+#include "DS1820.h"
+#include "HCSR04.h"
+#include "RateLimiter.h"
+
+
+// Hardware pinout constants
+// ds1820 temperature probe
 #define TEMPERATURE_PROBE_PIN p8
+// SSR in-line with coffee pot power switch
 #define HEATER_PIN p21
+// hc-sr04 ultrasonic ranger for water level
+#define WATER_HCSR04_TRIG_PIN p22
+#define WATER_HCSR04_ECHO_PIN p23
+
+// other constants
+// heater is disabled if the range finder goes above this distance (in inches) 
+#define MAX_WATER_DISTANCE 7.5
 
 // Watchdog class based on
 // https://developer.mbed.org/cookbook/WatchDog-Timer
@@ -48,6 +62,7 @@ public:
     }
 };
 
+
 // helper method
 bool starts_with(const char *pre, const char *str) {
     size_t lenpre = strlen(pre),
@@ -56,66 +71,111 @@ bool starts_with(const char *pre, const char *str) {
 }
 
 // Globals
-DigitalOut heater(HEATER_PIN);
-DS1820 probe(TEMPERATURE_PROBE_PIN);
 Watchdog wdt;
-Serial pc(USBTX, USBRX);
 
+DigitalOut heater(HEATER_PIN);
+DS1820 temp_probe(TEMPERATURE_PROBE_PIN);
+HCSR04 water_level_sensor(WATER_HCSR04_TRIG_PIN, WATER_HCSR04_ECHO_PIN);
+double water_distance_inches;
+
+Serial pc(USBTX, USBRX);
+// serial receive buffer
 #define RECEIVE_BUFF_SIZE 7*3
 char recv_buff[RECEIVE_BUFF_SIZE];
 
 // For debug only, this is an LED on the mbed device.
 DigitalOut led1(LED1);
 
+void update_water_level() {
+    water_distance_inches = water_level_sensor.read_inches();
+}
+
+// process_line handles one line of input and returns true if the line
+// was valid / handled and WDT should be reset
+bool process_line(const char *recv_buff) {
+    if (starts_with("WATER+?", recv_buff)) {
+        // reply with water distance measurement (inches, to two places)
+        pc.printf("WATER+%.2f\n", water_distance_inches);
+
+    } else if (starts_with("TEMP+?", recv_buff)) {
+        // read temp and reply with temperature
+        temp_probe.convertTemperature(true, DS1820::this_device);
+        double temperature = temp_probe.temperature();
+        pc.printf("TEMP+%.1f\n", temperature);
+
+    } else if (starts_with("BREW+", recv_buff)) {
+        // update heater setting and reply with heater value
+        // ignore input and don't leave the heater on if there is no water
+        bool new_heater = recv_buff[5] != '0' && 
+                          (water_distance_inches < MAX_WATER_DISTANCE);
+        heater = new_heater;
+        if (new_heater) {
+            pc.printf("BREW+1\n");
+        } else {
+            pc.printf("BREW+0\n");
+        }
+
+    } else {
+        return false;
+    }
+    // if we don't hit the else above, we processed a line
+    return true;
+}
+
 // main() runs in its own thread in mbed-OS
 int main() {
     // clarify that heater is off on boot
     heater = false;
+    // zero other vars
+    memset(recv_buff, 0, RECEIVE_BUFF_SIZE);
+    water_distance_inches = std::numeric_limits<double>::max();
+
+    // Initialization, set up watchdog, serial, etc.
     pc.baud(115200);
     pc.printf("MrCoffeeBot v2.0 Booted.\n");
     // 5 second timeout before rebooting
-    wdt.setTimeout(10);
-    // TODO: talk to DS1820
-    double temperature = std::numeric_limits<double>::quiet_NaN();
-    // main loopFlag
+    // WDT is fed when handling a valid line
+    wdt.setTimeout(5);
+
+    // loop vars
+    // NOTE: if we poll the HCSR04 too fast the readings are useless
+    RateLimiter water_level_sensor_limiter(5000, update_water_level);
+    water_level_sensor_limiter.fn();
+    // current location in the receive buffer
     char *curr_buff = recv_buff;
-    memset(recv_buff, 0, RECEIVE_BUFF_SIZE);
     while (true) {
-        led1 = !led1;
-        // get a line
-        bool newline = false;
-        while (!newline) {
-            // wait for character
-            // while (!pc.readable());
+        // poll sensors
+        // NOTE: *not* the temperature, which is slow to read
+        water_level_sensor_limiter.call();
+
+        // handle input
+        bool received_newline = false;
+        if (pc.readable()) {
             // don't overflow read buffer, at this point something is wrong
             if (curr_buff == recv_buff + RECEIVE_BUFF_SIZE) {
                 curr_buff = recv_buff;
             }
             *curr_buff = pc.getc();
-            newline = (*curr_buff == '\n');
+            received_newline = (*curr_buff == '\n');
             curr_buff++;
         }
-        // process line
-        if (starts_with("TEMP+?", recv_buff)) {
-            // reset watchdog
-            wdt.feed();
-            // reply with temperature
-            probe.convertTemperature(true, DS1820::this_device);
-            temperature = probe.temperature();
-            pc.printf("TEMP+%.1f\n", temperature);
-        } else if (starts_with("BREW+", recv_buff)) {
-            // reset watchdog
-            wdt.feed();
-            // update heater setting and reply with heater value
-            bool new_heater = recv_buff[5] != '0';
-            heater = new_heater;
-            if (new_heater) {
-                pc.printf("BREW+1\n");
-            } else {
-                pc.printf("BREW+0\n");
+
+        // process a line if we have one
+        if (received_newline) {
+            // and feed the watchdog if we process a legitimate line
+            if (process_line(recv_buff)) {
+                wdt.feed();
+                // debug feeding watchdog
+                led1 = !led1;
             }
+            // reset buffer after processing a line
+            curr_buff = recv_buff;
         }
-        curr_buff = recv_buff;
+
+        // always disable heater if there is no water
+        if (water_distance_inches > MAX_WATER_DISTANCE) {
+            heater = false;
+        }
     }
 }
 

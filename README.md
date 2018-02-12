@@ -2,6 +2,8 @@
 
 This is the software that runs my modified 12 - Cup Mr. Coffee pot.
 
+NOTE: only the mbed / c++ code is used currently, the python client is dated and bad.
+
 ## Hardware
 
 The controller is an Mbed [NXP LPC1768](https://developer.mbed.org/platforms/mbed-LPC1768/),

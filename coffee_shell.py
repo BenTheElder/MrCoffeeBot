@@ -48,8 +48,14 @@ def do_brew(bot, seconds=0, cups=None):
                 temp_s = "?"
             else:
                 temp_s = "%.1f" % (temp)
-            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c        \r"%
-                                (now_date, remaining, temp_s))
+            water = bot.maybe_current_water()
+            water_s = ""
+            if water is None or water == 0:
+                water_s = "?"
+            else:
+                waters_s = "%.2f" % (water)
+            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c  Water: %s in     \r"%
+                                (now_date, remaining, temp_s, water_s))
             sys.stdout.flush()
             now = time.time()
     else:
@@ -67,8 +73,14 @@ def do_brew(bot, seconds=0, cups=None):
                 temp_s = "?"
             else:
                 temp_s = "%.1f" % (temp)
-            sys.stdout.write("TIME: %s Target Temp: %.1f Temp: %s c        \r"%
-                                (now_date, TARGET_INITIAL_TEMP, temp_s))
+            water = bot.maybe_current_water()
+            water_s = ""
+            if water is None or water == 0:
+                water_s = "?"
+            else:
+                waters_s = "%.2f" % (water)
+            sys.stdout.write("TIME: %s Target Temp: %.1f Temp: %s c  Water: %s in     \r"%
+                                (now_date, TARGET_INITIAL_TEMP, temp_s, water_s))
             sys.stdout.flush()
         brew_seconds = SECONDS_PER_CUP * cups
         now = time.time()
@@ -82,8 +94,13 @@ def do_brew(bot, seconds=0, cups=None):
                 temp_s = "?"
             else:
                 temp_s = "%.1f" % (temp)
-            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c        \r"%
-                                (now_date, remaining, temp_s))
+            water_s = ""
+            if water is None or water == 0:
+                water_s = "?"
+            else:
+                waters_s = "%.2f" % (water)
+            sys.stdout.write("TIME: %s Remaining: %f Temp: %s c Water: %s       \r"%
+                                (now_date, remaining, temp_s, water_s))
             now = time.time()
     print("\nTurning off Heater.")
     bot.turn_off_heater()

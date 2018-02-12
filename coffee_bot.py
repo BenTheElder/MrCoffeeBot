@@ -16,6 +16,7 @@ limitations under the License.
 from Queue import Queue
 from threading import Thread
 from time import time
+import platform
 
 
 import serial
@@ -35,7 +36,7 @@ def _run_thread(serial_port, state):
         serial_port.flushOutput()
         shutdown = False
         while not shutdown:
-            message = "TEMP+?\n".encode('utf-8')
+            message = "WATER+?\n".encode('utf-8')
             if not state.queue.empty():
                 message = state.queue.get_nowait()
                 if message == "SHUTDOWN":
@@ -49,7 +50,7 @@ def _run_thread(serial_port, state):
                 except serial.SerialTimeoutException:
                     print("EXCEPTION")
                     return
-                written += curr_written            
+                written += curr_written
             bytes, curr_byte = "", ''
             while not '\n' in bytes:
                 read_bytes = serial_port.read(size=20)
@@ -57,7 +58,11 @@ def _run_thread(serial_port, state):
                     bytes += read_bytes
             state.last_response_time = time()
             reply = bytes.decode('utf-8')
-            #print(reply)
+            if reply.startswith("WATER+"):
+                try:
+                    state.current_water = float(reply[6:len(reply)-1])
+                except:
+                    pass
             if reply.startswith("TEMP+"):
                 try:
                     state.current_temp = float(reply[5:len(reply)-1])
@@ -76,6 +81,7 @@ class MrCoffeeBot(object):
             self.queue = Queue()
             self.last_response_time = None
             self.current_temp = 0.0
+            self.current_water = 0.0
             self.heater_on = False
 
     def __init__(self, port_path, baud=115200):
@@ -120,6 +126,9 @@ class MrCoffeeBot(object):
     def maybe_current_temp(self):
         return self._state.current_temp
 
+    def maybe_current_water(self):
+        return self._state.current_water
+
     def maybe_last_response_time(self):
         return self._state.last_response_time
 
@@ -151,6 +160,8 @@ def get_coffee_bot(serial_string=None):
     devices, details = get_possible_ports()
     for i in range(len(devices)):
         path, (ser, port) = devices[i], details[i]
+        if path.startswith("/dev/cu."):
+            path = path.replace("/dev/cu.", "/dev/tty.")
         if serial_string:
             if serial_string == ser:
                 return MrCoffeeBot(path)
