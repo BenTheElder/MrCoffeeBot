@@ -93,32 +93,53 @@ bool probably_has_water() {
     // 7.5 inches is roughly the real maximum
     // after ~8.2 we can guess that the steam has skewed the measurement
     // after 20 (most arbitrary) the steam is intense and we should back off
-    return d < 7.5 || d > 8.2 && d < 20;
+    return (d < 7.5) || (d > 8.2 && d < 20);
+}
+
+
+/*
+Methods for replying with statuses for varioius sensors
+*/
+void send_water() {
+    pc.printf("WATER+%.2f\n", water_distance_inches);
+}
+
+void send_temp() {
+    // read temp and reply with temperature
+    temp_probe.convertTemperature(true, DS1820::this_device);
+    double temperature = temp_probe.temperature();
+    pc.printf("TEMP+%.1f\n", temperature);
+}
+
+void send_brew() {
+    if (heater) {
+        pc.printf("BREW+1\n");
+    } else {
+        pc.printf("BREW+0\n");
+    }
 }
 
 // process_line handles one line of input and returns true if the line
 // was valid / handled and WDT should be reset
 bool process_line() {
-    if (starts_with("WATER+?", recv_buff)) {
-        // reply with water distance measurement (inches, to two places)
-        pc.printf("WATER+%.2f\n", water_distance_inches);
+    if (starts_with("STATUS+?", recv_buff)) {
+        pc.printf("STATUS+1\n");
+        send_water();
+        send_temp();
+        send_brew();
+
+    } else if (starts_with("WATER+?", recv_buff)) {
+        send_water();
 
     } else if (starts_with("TEMP+?", recv_buff)) {
-        // read temp and reply with temperature
-        temp_probe.convertTemperature(true, DS1820::this_device);
-        double temperature = temp_probe.temperature();
-        pc.printf("TEMP+%.1f\n", temperature);
+        send_temp();
 
     } else if (starts_with("BREW+", recv_buff)) {
         // update heater setting and reply with heater value
         // ignore input and don't leave the heater on if there is no water
         bool new_heater = (recv_buff[5] != '0') && probably_has_water();
         heater = new_heater;
-        if (new_heater) {
-            pc.printf("BREW+1\n");
-        } else {
-            pc.printf("BREW+0\n");
-        }
+        send_brew();
 
     } else {
         return false;
