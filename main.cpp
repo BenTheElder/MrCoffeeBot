@@ -92,7 +92,7 @@ DigitalOut led1(LED1);
 
 
 void update_temperature() {
-    temp_probe.convertTemperature(true, DS1820::this_device);
+    temp_probe.convertTemperature(false, DS1820::this_device);
     temperature = temp_probe.temperature();
 }
 
@@ -109,58 +109,39 @@ bool probably_has_water() {
 }
 
 
-/*
-Methods for replying with statuses for varioius sensors
-*/
-void send_water() {
-    pc.printf("W+%.2f\n", water_distance_inches);
-}
-
-void send_temp() {
-    pc.printf("T+%.1f\n", temperature);
-}
-
-void send_brew() {
-    if (heater) {
-        pc.printf("B+1\n");
-    } else {
-        pc.printf("B+0\n");
-    }
-}
-
 void reset() {
     reset_pin.mode(OpenDrain);
 }
 
-#define COMMAND_STATUS       "S"
-#define COMMAND_WATER_LEVEL  "W"
-#define COMMAND_TEMP         "T"
-#define COMMAND_BREW         "B"
+#define COMMAND_RESET        "RESET"
+#define COMMAND_STATUS       "S+?"
+#define COMMAND_BREW_ENABLE  "B+1"
+#define COMMAND_BREW_DISABLE "B+0"
+
+void send_status() {
+    pc.printf("W+%.2f\nT+%.1f\nB+%d\n", 
+              water_distance_inches, temperature, heater ? 1 : 0);
+}
 
 // process_line handles one line of input and returns true if the line
 // was valid / handled and WDT should be reset
 bool process_line() {
-    if (starts_with("RESET", recv_buff)) {
-        reset();
+    if (starts_with(COMMAND_STATUS, recv_buff)) {
+        send_status();
 
-    } else if (starts_with("S+?", recv_buff)) {
-        pc.printf("S+1\n");
-        send_water();
-        send_temp();
-        send_brew();
-
-    } else if (starts_with("W+?", recv_buff)) {
-        send_water();
-
-    } else if (starts_with("T+?", recv_buff)) {
-        send_temp();
-
-    } else if (starts_with("B+", recv_buff)) {
+    } else if (starts_with(COMMAND_BREW_ENABLE, recv_buff)) {
         // update heater setting and reply with heater value
         // ignore input and don't leave the heater on if there is no water
-        bool new_heater = (recv_buff[5] != '0') && probably_has_water();
+        bool new_heater = true && probably_has_water();
         heater = new_heater;
-        send_brew();
+        send_status();
+
+    } else if (starts_with(COMMAND_BREW_DISABLE, recv_buff)) {
+        heater = false;
+        send_status();
+
+    } else if (starts_with(COMMAND_RESET, recv_buff)) {
+        reset();
 
     } else {
         return false;
@@ -190,7 +171,7 @@ int main() {
     update_water_level();
     update_temperature();
     RateLimiter water_level_sensor_rate_limiter(5000, update_water_level);
-    RateLimiter temperature_sensor_rate_limiter(100000, update_temperature);
+    RateLimiter temperature_sensor_rate_limiter(5000, update_temperature);
     // current location in the receive buffer
     char *curr_buff = recv_buff;
     while (true) {

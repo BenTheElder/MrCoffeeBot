@@ -23,12 +23,16 @@ class HCSR04 {
 private:
     DigitalOut trig;
     DigitalIn echo;
+    int       max_read_usec;
 public:
-    HCSR04(PinName trigger_pin, PinName echo_pin) : trig(trigger_pin), echo(echo_pin) {}
+    HCSR04(PinName trigger_pin, PinName echo_pin) : trig(trigger_pin), echo(echo_pin) {
+        this->set_max_read_inches(72);
+    }
 
     // trigger sensor and read raw timing in us
     int read_raw() {
         Timer tmr;
+        const int max_read = this->max_read_usec;
         // clear trigger pin low
         this->trig.write(0);
         wait_us(5);
@@ -40,7 +44,7 @@ public:
         // wait for low first, then start timing
         while (!echo);
         tmr.start();
-        while (echo);
+        while (echo && tmr.read_us() < max_read);
         tmr.stop();
         return tmr.read_us();
     }
@@ -53,6 +57,13 @@ public:
     // trigger sensor and return inches read
     double read_inches() {
         return inches_from_raw(this->read_raw());
+    }
+
+    // set the maximum read inches before timeout,
+    // note that this avoids hanging while reading the sensor
+    // setting a very high value with negatively impact pathological reads
+    void set_max_read_inches(double max_inches) {
+        this->max_read_usec = 74 * 2 * max_inches;
     }
 };
 
