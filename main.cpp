@@ -62,13 +62,6 @@ public:
 };
 
 
-// helper method
-bool starts_with(const char *pre, const char *str) {
-    size_t lenpre = strlen(pre),
-           lenstr = strlen(str);
-    return lenstr < lenpre ? false : strncmp(pre, str, lenpre) == 0;
-}
-
 // Globals
 Watchdog wdt;
 
@@ -100,24 +93,24 @@ void update_water_level() {
     water_distance_inches = water_level_sensor.read_inches();
 }
 
-bool probably_has_water() {
-    double d = water_distance_inches;
-    // 7.5 inches is roughly the real maximum
-    // after ~9.4 we can guess that the steam has skewed the measurement
-    // after 20 (most arbitrary) the steam is intense and we should back off
-    return (d < 7.5) || (d > 9.4 && d < 20);
-}
-
-
 void reset() {
     reset_pin.mode(OpenDrain);
 }
 
+// serial command strings
 #define COMMAND_RESET        "RESET"
 #define COMMAND_STATUS       "S+?"
 #define COMMAND_BREW_ENABLE  "B+1"
 #define COMMAND_BREW_DISABLE "B+0"
 
+// helper method for handling serial commands
+bool starts_with(const char *pre, const char *str) {
+    size_t lenpre = strlen(pre),
+           lenstr = strlen(str);
+    return lenstr < lenpre ? false : strncmp(pre, str, lenpre) == 0;
+}
+
+// status of all sensors + heater enable (W = Water, T = Temp, B = BREW)
 void send_status() {
     pc.printf("W+%.2f\nT+%.1f\nB+%d\n", 
               water_distance_inches, temperature, heater ? 1 : 0);
@@ -130,10 +123,7 @@ bool process_line() {
         send_status();
 
     } else if (starts_with(COMMAND_BREW_ENABLE, recv_buff)) {
-        // update heater setting and reply with heater value
-        // ignore input and don't leave the heater on if there is no water
-        bool new_heater = true && probably_has_water();
-        heater = new_heater;
+        heater = true;
         send_status();
 
     } else if (starts_with(COMMAND_BREW_DISABLE, recv_buff)) {
@@ -201,11 +191,6 @@ int main() {
             }
             // reset buffer after processing a line
             curr_buff = recv_buff;
-        }
-
-        // always disable heater if there is no water
-        if (!probably_has_water()) {
-            heater = false;
         }
     }
 }
