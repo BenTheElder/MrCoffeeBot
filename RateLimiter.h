@@ -35,11 +35,20 @@ public:
     // call if enough time has passed, return true if called
     bool call() {
         if (this->timer.read_us() >= this->rate_us) {
-            this->fn();
-            this->timer.reset();
+            this->ignore_limit_and_call();
             return true;
         }
         return false;
+    }
+
+    // call regardless of time limit, though also reset timer
+    void ignore_limit_and_call() {
+        this->fn();
+        this->timer.reset();
+    }
+
+    void set_fn(void (*f)(void)) {
+        this->fn = f;
     }
 };
 
